@@ -1,7 +1,10 @@
 -module(control).
 -import(dht, [start/1, get_node_info/1, add_key/2, calculate_hash/1, get_node_info/1]).
 -import(lists, [nth/2, map/2]).
+-import(string, [to_lower/1]).
 -export([start/0, init/0]).
+
+-define(NumberOfNodes, 10).
 
 start() ->
     spawn(?MODULE, init, []).
@@ -23,21 +26,65 @@ init() ->
     % Start initial DHT node
 
     % Start with 10 nodes
-    {ok, Nodes} = dht:start(10),
+    {ok, Nodes} = dht:start(?NumberOfNodes),
 
     % Add keys to DHT
     add_keys_to_dht(Keys, Nodes),
 
+    % Logging node information to folder
+    case create_directory(io_lib:format("dht_~p", [?NumberOfNodes])) of
+        ok -> ok;
+        {error, Reason} -> io:format("Error: ~p~n", [Reason])
+    end,
+
+    % Data = map(
+    %     fun(Node) ->
+    %         {NodeId, _, Succ, Pred, KeyRecvd} = get_node_info(Node),
+    %         io:format("Node ~p: Succ ~p, Pred ~p~n", [NodeId, Succ, Pred]),
+    %         maps:size(KeyRecvd)
+    %     end,
+    %     Nodes
+    % ),
+    % io:format("Keys stored in each node: ~p~n", [Data]).
+
     % figure out how many keys are stored in each node
-    Data = map(
+    map(
         fun(Node) ->
-            {NodeId, _, Succ, Pred, KeyRecvd} = get_node_info(Node),
-            io:format("Node ~p: Succ ~p, Pred ~p~n", [NodeId, Succ, Pred]),
-            maps:size(KeyRecvd)
+            {NodeId, Identifier, Succ, Pred, KeyRecvd} = get_node_info(Node),
+            % TODO: remove this debug print
+            io:format("Node ~p: Succ ~p, Pred ~p, Number of Keys stored: ~p~n", [
+                NodeId, Succ, Pred, maps:size(KeyRecvd)
+            ]),
+
+            % node_identifier,successor_identifier,predecessor_identifier|key1_identifier|key2_identifier|key3_identifier...
+            % All the identifier need to be a string representing the hex identifier. For exemple: "a3e324f01ab359d2"
+            KeysList = lists:foldl(
+                % basically go through all the keys and append them to the list by separating them with "|", except the last one
+                fun(Key, Acc) ->
+                    % KeyStr = string:to_lower(integer_to_list(Key, 16)),
+                    KeyStr = Key,
+                    case Acc of
+                        "" -> KeyStr;
+                        _ -> Acc ++ "|" ++ KeyStr
+                    end
+                end,
+                "",
+                maps:keys(KeyRecvd)
+            ),
+
+            % write to file
+            file:write_file(
+                io_lib:format("dht_~p/node_~p.csv", [?NumberOfNodes, NodeId]),
+                io_lib:format("~p,~p,~p|~s~n", [
+                    Identifier,
+                    Succ,
+                    Pred,
+                    KeysList
+                ])
+            )
         end,
         Nodes
-    ),
-    io:format("Keys stored in each node: ~p~n", [Data]).
+    ).
 
 % Process queries
 % process_queries(Queries, Nodes).
@@ -59,3 +106,9 @@ parse_keys(Data) ->
 %             io:format("Query: ~p -> value: ~p~n", [Query, Value])
 %     end,
 %     process_queries(Rest, Nodes).
+
+create_directory(Dir) ->
+    case file:make_dir(Dir) of
+        {error, eexist} -> ok;
+        ok -> ok
+    end.

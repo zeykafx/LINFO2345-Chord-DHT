@@ -3,7 +3,7 @@
 -import(crypto, [hash/2]).
 
 -define(M, 16).
--define(Max_Key, math:pow(2, ?M) - 1).
+-define(Max_Key, round(math:pow(2, ?M)) - 1).
 
 % Starts the system with N nodes
 start(N) ->
@@ -101,6 +101,12 @@ find_predecessor(Id, NodeIds) ->
 % Utility: Calculate SHA-1 hash of an identifier
 calculate_hash(Key) ->
     IntKey = integer_to_list(Key),
-    crypto:bytes_to_integer(crypto:hash(sha, IntKey)).
+    % rem is the modulo operator
+    <<Id:160/integer>> = crypto:hash(sha, IntKey),
+    HashResult = Id rem ?Max_Key,
+    string:to_lower(integer_to_list(HashResult, 16)).
 
-    % erlang:phash2(IntKey, 1 bsl ?M).
+% HashResult = crypto:bytes_to_integer(crypto:hash(sha, IntKey)) rem ?Max_Key,
+    % string:to_lower(integer_to_list(HashResult, 16)).
+
+% erlang:phash2(IntKey, 1 bsl ?M).
