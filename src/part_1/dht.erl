@@ -1,6 +1,6 @@
 -module(dht).
 -export([start/1, init_node/2, get_node_info/1, add_key/2, calculate_hash/1]).
--import(crypto, [hash/2]).
+-import(crypto, [hash/2, sha/1]).
 
 -define(M, 16).
 -define(Max_Key, round(math:pow(2, ?M)) - 1).
@@ -22,23 +22,33 @@ start(N) ->
 init_node(Id, NodeIds) ->
     Identifier = calculate_hash(Id),
     Successor = find_successor(Id, NodeIds),
+    HashedSuccessor = calculate_hash(Successor),
     Predecessor = find_predecessor(Id, NodeIds),
-    Keys = #{},
-    loop(Id, Identifier, Successor, Predecessor, Keys).
+    HashedPredecessor = calculate_hash(Predecessor),
+    loop(Id, Identifier, Successor, Predecessor, HashedSuccessor, HashedPredecessor, []).
 
 % Main loop for node state
-loop(Id, Identifier, Successor, Predecessor, Keys) ->
+loop(Id, Identifier, Successor, Predecessor, HashedSuccessor, HashedPredecessor, Keys) ->
     receive
         {add_key, Key} ->
-            % add the key to the map
+            % add the key to the list
             % key is already hashed
-            NewKeys = maps:put(Key, undefined, Keys),
+        
+            % case maps:is_key(Key, Keys) of
+            %     true -> io:format("Key ~p already exists in Node ~p~n", [Key, Id]);
+            %     false -> ok
+            % end,
+            % NewKeys = maps:put(Key, undefined, Keys),
             % io:format("Key ~p added to Node ~p~n", [Key, Id]),
-            loop(Id, Identifier, Successor, Predecessor, NewKeys);
+            NewList = lists:append(Keys, [Key]),
+            loop(
+                Id, Identifier, Successor, Predecessor, HashedSuccessor, HashedPredecessor, NewList
+            );
         {get_info, Caller} ->
             % return the node information
-            Caller ! {Id, Identifier, Successor, Predecessor, Keys},
-            loop(Id, Identifier, Successor, Predecessor, Keys);
+            Caller !
+                {Id, Identifier, Successor, Predecessor, HashedSuccessor, HashedPredecessor, Keys},
+            loop(Id, Identifier, Successor, Predecessor, HashedSuccessor, HashedPredecessor, Keys);
         stop ->
             ok
     end.
@@ -59,7 +69,7 @@ find_responsible_node(HashedKey, Nodes) ->
     % get the node information for each node
     NodeInfoList = lists:map(
         fun(Node) ->
-            {_, NodeId, _, _, _} = get_node_info(Node),
+            {_, NodeId, _, _, _, _, _} = get_node_info(Node),
             {NodeId, Node}
         end,
         Nodes
@@ -100,13 +110,14 @@ find_predecessor(Id, NodeIds) ->
 
 % Utility: Calculate SHA-1 hash of an identifier
 calculate_hash(Key) ->
-    IntKey = integer_to_list(Key),
-    % rem is the modulo operator
-    <<Id:160/integer>> = crypto:hash(sha, IntKey),
+    StringKey = integer_to_list(Key),
+    % Id = crypto:bytes_to_integer(crypto:hash(sha, StringKey)),
+    <<Id:160/integer>> = crypto:hash(sha, StringKey),
     HashResult = Id rem ?Max_Key,
     string:to_lower(integer_to_list(HashResult, 16)).
 
-% HashResult = crypto:bytes_to_integer(crypto:hash(sha, IntKey)) rem ?Max_Key,
+% This other way to hash gives the same results
+    % HashResult = crypto:bytes_to_integer(crypto:hash(sha, IntKey)) rem ?Max_Key,
     % string:to_lower(integer_to_list(HashResult, 16)).
 
 % erlang:phash2(IntKey, 1 bsl ?M).

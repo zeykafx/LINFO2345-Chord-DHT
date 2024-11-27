@@ -18,11 +18,6 @@ init() ->
     % {ok, QueriesData} = file:read_file("key_queries.csv"),
     % Queries = parse_keys(QueriesData),
 
-    % test: hash keys and print it out
-    % HeadKeys = [nth(X, Keys) || X <- lists:seq(1, 10)],
-    % io:format("Keys: ~p~n", [HeadKeys]),
-    % map(fun(X) -> Hash = calculate_hash(X), io:format("hash: ~p -> ~p ~n", [X, Hash])  end, HeadKeys),
-
     % Start initial DHT node
 
     % Start with 10 nodes
@@ -37,23 +32,17 @@ init() ->
         {error, Reason} -> io:format("Error: ~p~n", [Reason])
     end,
 
-    % Data = map(
-    %     fun(Node) ->
-    %         {NodeId, _, Succ, Pred, KeyRecvd} = get_node_info(Node),
-    %         io:format("Node ~p: Succ ~p, Pred ~p~n", [NodeId, Succ, Pred]),
-    %         maps:size(KeyRecvd)
-    %     end,
-    %     Nodes
-    % ),
-    % io:format("Keys stored in each node: ~p~n", [Data]).
-
     % figure out how many keys are stored in each node
     map(
         fun(Node) ->
-            {NodeId, Identifier, Succ, Pred, KeyRecvd} = get_node_info(Node),
+            % node id is not hashed, Identifier is hashed
+            {NodeId, Identifier, Succ, Pred, HashedSucc, HashedPred, KeysListRcvd} = get_node_info(
+                Node
+            ),
+
             % TODO: remove this debug print
-            io:format("Node ~p: Succ ~p, Pred ~p, Number of Keys stored: ~p~n", [
-                NodeId, Succ, Pred, maps:size(KeyRecvd)
+            io:format("Node ~p (hash: ~s): Succ ~p, Pred ~p, Number of Keys stored: ~p~n", [
+                NodeId, Identifier, Succ, Pred, length(KeysListRcvd)
             ]),
 
             % node_identifier,successor_identifier,predecessor_identifier|key1_identifier|key2_identifier|key3_identifier...
@@ -69,16 +58,16 @@ init() ->
                     end
                 end,
                 "",
-                maps:keys(KeyRecvd)
+                KeysListRcvd
             ),
 
             % write to file
             file:write_file(
                 io_lib:format("dht_~p/node_~p.csv", [?NumberOfNodes, NodeId]),
-                io_lib:format("~p,~p,~p|~s~n", [
+                io_lib:format("~s,~s,~s|~s~n", [
                     Identifier,
-                    Succ,
-                    Pred,
+                    HashedPred,
+                    HashedSucc,
                     KeysList
                 ])
             )
