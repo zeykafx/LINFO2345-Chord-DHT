@@ -1,2 +1,4 @@
 # ignore beam files
 *.beam
+.idea/
+.code/

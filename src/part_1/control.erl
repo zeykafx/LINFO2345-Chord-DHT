@@ -1,7 +1,9 @@
 -module(control).
--import(dht, [start/1, get_node_info/1, add_key/2, calculate_hash/1, get_node_info/1]).
+-import(dht, [start/1, get_node_info/1, add_key/2, calculate_hash/1]).
 -import(lists, [nth/2, map/2]).
 -import(string, [to_lower/1]).
+-import(file, [read_file/1, write_file/2, make_dir/1]).
+-import(io_lib, [format/2]).
 -export([start/0, init/0]).
 
 -define(NumberOfNodes, 10).
@@ -20,7 +22,7 @@ init() ->
 
     % Start initial DHT node
 
-    % Start with 10 nodes
+    % Start with ?NumberOfNodes nodes
     {ok, Nodes} = dht:start(?NumberOfNodes),
 
     % Add keys to DHT
@@ -33,14 +35,13 @@ init() ->
     end,
 
     % figure out how many keys are stored in each node
-    map(
+    lists:map(
         fun(Node) ->
             % node id is not hashed, Identifier is hashed
             {NodeId, Identifier, Succ, Pred, HashedSucc, HashedPred, KeysListRcvd} = get_node_info(
                 Node
             ),
-
-            % TODO: remove this debug print
+        
             io:format("Node ~p (hash: ~s): Succ ~p, Pred ~p, Number of Keys stored: ~p~n", [
                 NodeId, Identifier, Succ, Pred, length(KeysListRcvd)
             ]),

@@ -1,6 +1,7 @@
 -module(dht).
 -export([start/1, init_node/2, get_node_info/1, add_key/2, calculate_hash/1]).
 -import(crypto, [hash/2, sha/1]).
+-import(lists, [seq/2, map/2, filter/2, append/2, reverse/1]).
 
 -define(M, 16).
 -define(Max_Key, round(math:pow(2, ?M)) - 1).
@@ -33,13 +34,6 @@ loop(Id, Identifier, Successor, Predecessor, HashedSuccessor, HashedPredecessor,
         {add_key, Key} ->
             % add the key to the list
             % key is already hashed
-        
-            % case maps:is_key(Key, Keys) of
-            %     true -> io:format("Key ~p already exists in Node ~p~n", [Key, Id]);
-            %     false -> ok
-            % end,
-            % NewKeys = maps:put(Key, undefined, Keys),
-            % io:format("Key ~p added to Node ~p~n", [Key, Id]),
             NewList = lists:append(Keys, [Key]),
             loop(
                 Id, Identifier, Successor, Predecessor, HashedSuccessor, HashedPredecessor, NewList
@@ -111,8 +105,8 @@ find_predecessor(Id, NodeIds) ->
 % Utility: Calculate SHA-1 hash of an identifier
 calculate_hash(Key) ->
     StringKey = integer_to_list(Key),
-    % Id = crypto:bytes_to_integer(crypto:hash(sha, StringKey)),
-    <<Id:160/integer>> = crypto:hash(sha, StringKey),
+    Id = crypto:bytes_to_integer(crypto:hash(sha, StringKey)),
+    % <<Id:160/integer>> = crypto:hash(sha, StringKey),
     HashResult = Id rem ?Max_Key,
     string:to_lower(integer_to_list(HashResult, 16)).
 
@@ -120,4 +114,3 @@ calculate_hash(Key) ->
     % HashResult = crypto:bytes_to_integer(crypto:hash(sha, IntKey)) rem ?Max_Key,
     % string:to_lower(integer_to_list(HashResult, 16)).
 
-% erlang:phash2(IntKey, 1 bsl ?M).
