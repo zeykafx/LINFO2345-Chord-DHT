@@ -1,12 +1,14 @@
 -module(control).
--import(dht, [start/1, get_node_info/1, add_key/2, calculate_hash/1]).
+-import(dht, [start/1, get_node_info/1, add_key/2, calculate_hash/1, hash_to_string/1]).
 -import(lists, [nth/2, map/2]).
 -import(string, [to_lower/1]).
 -import(file, [read_file/1, write_file/2, make_dir/1]).
 -import(io_lib, [format/2]).
 -export([start/0, init/0]).
 
+% MODIFY THE NUMBER OF NODES HERE ---------------------------
 -define(NumberOfNodes, 10).
+% ----------------------------------------------------------
 
 start() ->
     spawn(?MODULE, init, []).
@@ -41,9 +43,12 @@ init() ->
             {NodeId, Identifier, Succ, Pred, HashedSucc, HashedPred, KeysListRcvd} = get_node_info(
                 Node
             ),
-        
+            HexIdentifier = hash_to_string(Identifier),
+            HexSucc = hash_to_string(HashedSucc),
+            HexPred = hash_to_string(HashedPred),
+
             io:format("Node ~p (hash: ~s): Succ ~p, Pred ~p, Number of Keys stored: ~p~n", [
-                NodeId, Identifier, Succ, Pred, length(KeysListRcvd)
+                NodeId, HexIdentifier, Succ, Pred, length(KeysListRcvd)
             ]),
 
             % node_identifier,successor_identifier,predecessor_identifier|key1_identifier|key2_identifier|key3_identifier...
@@ -52,7 +57,7 @@ init() ->
                 % basically go through all the keys and append them to the list by separating them with "|", except the last one
                 fun(Key, Acc) ->
                     % KeyStr = string:to_lower(integer_to_list(Key, 16)),
-                    KeyStr = Key,
+                    KeyStr = hash_to_string(Key),
                     case Acc of
                         "" -> KeyStr;
                         _ -> Acc ++ "|" ++ KeyStr
@@ -66,9 +71,9 @@ init() ->
             file:write_file(
                 io_lib:format("dht_~p/node_~p.csv", [?NumberOfNodes, NodeId]),
                 io_lib:format("~s,~s,~s|~s~n", [
-                    Identifier,
-                    HashedPred,
-                    HashedSucc,
+                    HexIdentifier,
+                    HexPred,
+                    HexSucc,
                     KeysList
                 ])
             )

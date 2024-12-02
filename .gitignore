@@ -2,3 +2,4 @@
 *.beam
 .idea/
 .code/
+.DS_Store

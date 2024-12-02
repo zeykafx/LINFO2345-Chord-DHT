@@ -1,5 +1,5 @@
 -module(dht).
--export([start/1, init_node/2, get_node_info/1, add_key/2, calculate_hash/1]).
+-export([start/1, init_node/2, get_node_info/1, add_key/2, calculate_hash/1, hash_to_string/1]).
 -import(crypto, [hash/2, sha/1]).
 -import(lists, [seq/2, map/2, filter/2, append/2, reverse/1]).
 
@@ -108,9 +108,14 @@ calculate_hash(Key) ->
     Id = crypto:bytes_to_integer(crypto:hash(sha, StringKey)),
     % <<Id:160/integer>> = crypto:hash(sha, StringKey),
     HashResult = Id rem ?Max_Key,
-    string:to_lower(integer_to_list(HashResult, 16)).
+    % string:to_lower(integer_to_list(HashResult, 16)).
+    HashResult.
+
+hash_to_string(Hash) ->
+    string:to_lower(integer_to_list(Hash, 16)).
 
 % This other way to hash gives the same results
     % HashResult = crypto:bytes_to_integer(crypto:hash(sha, IntKey)) rem ?Max_Key,
     % string:to_lower(integer_to_list(HashResult, 16)).
+
 
