@@ -14,6 +14,9 @@ start() ->
     spawn(?MODULE, init, []).
 
 init() ->
+    io:format(
+        "Starting DHT--------------------------------------------------------------------------------~n"
+    ),
     % Read keys from keys.csv
     {ok, KeysData} = file:read_file("keys.csv"),
     Keys = parse_keys(KeysData),
@@ -31,19 +34,19 @@ init() ->
     % % Add keys to DHT
     % add_keys_to_dht(Keys, Nodes),
 
-    lists:map(
-        fun({_NodeId, _NodeIndex, Pid}) ->
-            % node id is not hashed, Identifier is hashed
-            {Identifier, Successor, Predecessor, KeysListRcvd, _FingerTable} = get_node_info(
-                Pid
-            ),
+    % lists:map(
+    %     fun({_NodeId, _NodeIndex, Pid}) ->
+    %         % node id is not hashed, Identifier is hashed
+    %         {Identifier, Successor, Predecessor, KeysListRcvd, _FingerTable} = get_node_info(
+    %             Pid
+    %         ),
 
-            io:format("Node ~p: Predecessor ~p, Successor ~p, Number of Keys stored: ~p~n", [
-                Identifier, Predecessor, Successor, length(KeysListRcvd)
-            ])
-        end,
-        NodesWithPid
-    ),
+    %         io:format("Node ~p: Predecessor ~p, Successor ~p, Number of Keys stored: ~p~n", [
+    %             Identifier, Predecessor, Successor, length(KeysListRcvd)
+    %         ])
+    %     end,
+    %     NodesWithPid
+    % ),
 
     % Process queries
     process_queries(Queries, NodesWithPid).

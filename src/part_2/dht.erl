@@ -17,8 +17,18 @@
 % Starts the system with N nodes
 start(N, Keys) ->
     NodeIds = lists:seq(0, N - 1),
-    HashedNodeIds = lists:map(fun(Id) -> calculate_hash(Id) end, NodeIds),
-    SortedHashedNodeIds = lists:sort(HashedNodeIds),
+    HashedNodeIds = lists:map(
+        fun(Id) ->
+            HashedId = calculate_hash(Id),
+            io:format("Node ~p: Hashed Id ~p~n", [Id, HashedId]),
+            {Id, HashedId}
+        end,
+        NodeIds
+    ),
+    SortedHashedNodeIds = lists:sort(
+        fun({_, Hash1}, {_, Hash2}) -> Hash1 =< Hash2 end,
+        HashedNodeIds
+    ),
     % io:format("Node Ids: ~p, length: ~p~n", [SortedHashedNodeIds, length(SortedHashedNodeIds)]),
 
     HashedKeys = lists:map(fun(Key) -> calculate_hash(Key) end, Keys),
@@ -49,8 +59,9 @@ set_keys_for_nodes(_NodeIds, SortedHashedNodeIds, SortedHashedKeys) ->
     lists:map(
         fun(Index) ->
             % get the node's hashed id
-            NodeId = lists:nth(Index, SortedHashedNodeIds),
-            PredecessorId = lists:nth(
+            {NodeIndex, NodeId} = lists:nth(Index, SortedHashedNodeIds),
+
+            {_PredecessorIndex, PredecessorId} = lists:nth(
                 ((Index - 2 + NumberNodes) rem NumberNodes + 1), SortedHashedNodeIds
             ),
             NodeKeys = lists:filter(
@@ -60,68 +71,73 @@ set_keys_for_nodes(_NodeIds, SortedHashedNodeIds, SortedHashedKeys) ->
                 end,
                 SortedHashedKeys
             ),
-            {NodeId, Index, NodeKeys}
+            {NodeId, NodeIndex, NodeKeys}
         end,
         lists:seq(1, NumberNodes)
     ).
 
 finish_initialization(NodesWithPid, SortedHashedNodeIds) ->
     lists:map(
-        fun({NodeId, NodeIndex, Pid}) ->
-            % get the node's hashed id
-            NodeIdIndex = lists:nth(NodeIndex, SortedHashedNodeIds),
+        fun(I) ->
+            {NodeId, _NodeIndex, Pid} = lists:nth(I, NodesWithPid),
 
             NumberNodes = length(SortedHashedNodeIds),
 
             % get the next node's hashed id
-            NextNodeIdIndex = ((NodeIdIndex) rem NumberNodes) + 1,
-            NextNodeId = lists:nth(NextNodeIdIndex, SortedHashedNodeIds),
+            NextNodeIndex = I rem NumberNodes + 1,
+            {NextHashedId, _NextNodeId, NextPid} = lists:nth(NextNodeIndex, NodesWithPid),
 
             % get the previous node's hashed id
-            PreviousNodeIdIndex = ((NodeIdIndex - 2 + NumberNodes) rem NumberNodes) + 1,
-            PreviousNodeId = lists:nth(PreviousNodeIdIndex, SortedHashedNodeIds),
+            % -2 because we are 1-indexed and we want the previous node
+            PreviousNodeIndex = ((I - 2) + NumberNodes) rem NumberNodes + 1,
+            {PreviousHashedId, _PreviousNodeId, PreviousPid} = lists:nth(
+                PreviousNodeIndex, NodesWithPid
+            ),
 
-            io:format("Node ~p: Next ~p, Previous ~p~n", [NodeId, NextNodeId, PreviousNodeId]),
+            io:format("Node ~p: Next ~p, Previous ~p~n", [NodeId, NextHashedId, PreviousHashedId]),
 
             % set the successor and predecessor for the node
-            Pid ! {set_successor, NextNodeId},
-            Pid ! {set_predecessor, PreviousNodeId},
+
+            % TODO: send the pid as well
+            Pid ! {set_successor, {NextHashedId, NextPid}},
+            Pid ! {set_predecessor, {PreviousHashedId, PreviousPid}},
 
             % Create the finger table for the node
-            FingerTable = create_finger_table(NodeId, SortedHashedNodeIds),
+            FingerTable = create_finger_table(I, NodesWithPid, NumberNodes),
+            io:format("Node ~p: Finger Table ~p~n", [NodeId, FingerTable]),
             Pid ! {set_finger_table, FingerTable}
         end,
-        NodesWithPid
+        lists:seq(1, length(NodesWithPid))
     ).
 
-create_finger_table(NodeId, SortedHashedNodeIds) ->
+create_finger_table(NodeIdx, NodesWithPid, NumberNodes) ->
+    % Create a finger table entry for each bit position
     lists:foldl(
-        fun(I, AccFingerTable) ->
-            % calculate the ith finger
-            Finger = (NodeId + trunc(math:pow(2, I - 1))) rem ?Max_Key,
-            % find the first node in the ring that has an id greater than the finger
-            FingerNode = lists:dropwhile(
-                fun(Id) -> Id =< Finger end,
-                SortedHashedNodeIds
+        fun(I, FingerTable) ->
+            % Calculate the target position for this finger
+            % Each finger jumps 2^(i-1) positions ahead
+            JumpDistance = trunc(math:pow(2, I-1)),
+            TargetPosition = (NodeIdx + JumpDistance) rem NumberNodes,
+            % io:format("Node ~p: Finger ~p, Target ~p, Target Node~p~n", [NodeId, I, TargetPosition, lists:nth(TargetPosition + 1, NodesWithPid)]),
+
+            {ResponsibleNodeHashedId, _, ResponsibleNodePid} = lists:nth(
+                TargetPosition+1, NodesWithPid
             ),
-            case FingerNode of
-                [] ->
-                    % wrap around
-                    FirstNode = lists:nth(1, SortedHashedNodeIds),
-                    maps:put(I, FirstNode, AccFingerTable);
-                [FirstNode | _] ->
-                    maps:put(I, FirstNode, AccFingerTable)
-            end
+
+            % Add to finger table
+            maps:put(I, {ResponsibleNodeHashedId, ResponsibleNodePid}, FingerTable)
         end,
+        % Start with empty map
         #{},
-        lists:seq(1, ?M)
+        % Create entries for 1 to M
+        lists:seq(0, ?M - 1)
     ).
 
 % Initializes a node with an identifier and the ring of nodes
 init_node(Identifier, _NodeIds, Keys) ->
     % Start with a node that has itself as the predecessor and successor
-    Predecessor = {Identifier, self()},
-    Successor = {Identifier, self()},
+    Predecessor = {Identifier, {Identifier, self()}},
+    Successor = {Identifier, {Identifier, self()}},
 
     % Initialize the finger table
     FingerTable = #{},
