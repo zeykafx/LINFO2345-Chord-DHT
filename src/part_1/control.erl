@@ -1,5 +1,5 @@
 -module(control).
--import(dht, [start/1, get_node_info/1, add_key/2, calculate_hash/1, hash_to_string/1]).
+-import(dht, [start/2, get_node_info/1, calculate_hash/1, hash_to_string/1]).
 -import(lists, [nth/2, map/2]).
 -import(string, [to_lower/1]).
 -import(file, [read_file/1, write_file/2, make_dir/1]).
@@ -7,7 +7,7 @@
 -export([start/0, init/0]).
 
 % MODIFY THE NUMBER OF NODES HERE ---------------------------
--define(NumberOfNodes, 10).
+-define(NumberOfNodes, 100).
 % ----------------------------------------------------------
 
 start() ->
@@ -25,10 +25,7 @@ init() ->
     % Start initial DHT node
 
     % Start with ?NumberOfNodes nodes
-    {ok, Nodes} = dht:start(?NumberOfNodes),
-
-    % Add keys to DHT
-    add_keys_to_dht(Keys, Nodes),
+    {ok, NodesWithPid} = dht:start(?NumberOfNodes, Keys),
 
     % Logging node information to folder
     case create_directory(io_lib:format("dht_~p", [?NumberOfNodes])) of
@@ -38,17 +35,14 @@ init() ->
 
     % figure out how many keys are stored in each node
     lists:map(
-        fun(Node) ->
+        fun({_NodeId, _NodeIndex, NodePid}) ->
             % node id is not hashed, Identifier is hashed
-            {NodeId, Identifier, Succ, Pred, HashedSucc, HashedPred, KeysListRcvd} = get_node_info(
-                Node
+            {NodeIndex, Identifier, {SuccId, _SuccPid}, {PredId, _PredPid}, KeysListRcvd} = get_node_info(
+                NodePid
             ),
-            HexIdentifier = hash_to_string(Identifier),
-            HexSucc = hash_to_string(HashedSucc),
-            HexPred = hash_to_string(HashedPred),
 
-            io:format("Node ~p (hash: ~s): Succ ~p, Pred ~p, Number of Keys stored: ~p~n", [
-                NodeId, HexIdentifier, Succ, Pred, length(KeysListRcvd)
+            io:format("Node ~p (hash: ~p): Succ ~p, Pred ~p, Number of Keys stored: ~p~n", [
+                NodeIndex, Identifier, SuccId, PredId, length(KeysListRcvd)
             ]),
 
             % node_identifier,successor_identifier,predecessor_identifier|key1_identifier|key2_identifier|key3_identifier...
@@ -69,24 +63,20 @@ init() ->
 
             % write to file
             file:write_file(
-                io_lib:format("dht_~p/node_~p.csv", [?NumberOfNodes, NodeId]),
+                io_lib:format("dht_~p/node_~p.csv", [?NumberOfNodes, NodeIndex]),
                 io_lib:format("~s,~s,~s|~s~n", [
-                    HexIdentifier,
-                    HexPred,
-                    HexSucc,
+                    hash_to_string(Identifier),
+                    hash_to_string(SuccId),
+                    hash_to_string(PredId),
                     KeysList
                 ])
             )
         end,
-        Nodes
+        NodesWithPid
     ).
 
 % Process queries
 % process_queries(Queries, Nodes).
-
-% add keys to DHT
-add_keys_to_dht(Keys, Nodes) ->
-    lists:foreach(fun(Key) -> dht:add_key(Nodes, Key) end, Keys).
 
 parse_keys(Data) ->
     Lines = string:tokens(binary_to_list(Data), "\n\r"),

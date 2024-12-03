@@ -1,5 +1,5 @@
 -module(control).
--import(dht, [start/1, get_node_info/1, add_key/2, calculate_hash/1, query_key/2]).
+-import(dht, [start/2, get_node_info/1, calculate_hash/1, query_key/2]).
 -import(lists, [nth/2, map/2]).
 -import(string, [to_lower/1]).
 -import(file, [read_file/1, write_file/2, make_dir/1]).

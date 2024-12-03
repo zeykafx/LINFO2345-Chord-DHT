@@ -2,8 +2,8 @@
 -export([
     start/2,
     get_node_info/1,
-    init_node/3,
-    loop/5,
+    init_node/4,
+    loop/6,
     calculate_hash/1,
     hash_to_string/1,
     query_key/2
@@ -40,7 +40,7 @@ start(N, Keys) ->
 
     Nodes = lists:map(
         fun({NodeId, NodeIndex, NodeKeys}) ->
-            Pid = spawn(?MODULE, init_node, [NodeId, SortedHashedNodeIds, NodeKeys]),
+            Pid = spawn(?MODULE, init_node, [NodeIndex, NodeId, SortedHashedNodeIds, NodeKeys]),
             {NodeId, NodeIndex, Pid}
         end,
         KeysForEachNode
@@ -98,7 +98,6 @@ finish_initialization(NodesWithPid, SortedHashedNodeIds) ->
 
             % set the successor and predecessor for the node
 
-            % TODO: send the pid as well
             Pid ! {set_successor, {NextHashedId, NextPid}},
             Pid ! {set_predecessor, {PreviousHashedId, PreviousPid}},
 
@@ -116,12 +115,12 @@ create_finger_table(NodeIdx, NodesWithPid, NumberNodes) ->
         fun(I, FingerTable) ->
             % Calculate the target position for this finger
             % Each finger jumps 2^(i-1) positions ahead
-            JumpDistance = trunc(math:pow(2, I-1)),
+            JumpDistance = trunc(math:pow(2, I - 1)),
             TargetPosition = (NodeIdx + JumpDistance) rem NumberNodes,
             % io:format("Node ~p: Finger ~p, Target ~p, Target Node~p~n", [NodeId, I, TargetPosition, lists:nth(TargetPosition + 1, NodesWithPid)]),
 
             {ResponsibleNodeHashedId, _, ResponsibleNodePid} = lists:nth(
-                TargetPosition+1, NodesWithPid
+                TargetPosition + 1, NodesWithPid
             ),
 
             % Add to finger table
@@ -134,15 +133,16 @@ create_finger_table(NodeIdx, NodesWithPid, NumberNodes) ->
     ).
 
 % Initializes a node with an identifier and the ring of nodes
-init_node(Identifier, _NodeIds, Keys) ->
+init_node(Identifier, NodeIndex, _NodeIds, Keys) ->
     % Start with a node that has itself as the predecessor and successor
-    Predecessor = {Identifier, {Identifier, self()}},
-    Successor = {Identifier, {Identifier, self()}},
+    Predecessor = {Identifier, self()},
+    Successor = {Identifier, self()},
 
     % Initialize the finger table
     FingerTable = #{},
 
     loop(
+        NodeIndex,
         Identifier,
         Successor,
         Predecessor,
@@ -151,13 +151,14 @@ init_node(Identifier, _NodeIds, Keys) ->
     ).
 
 % Main loop for node state
-loop(Identifier, Successor, Predecessor, Keys, FingerTable) ->
+loop(NodeIndex, Identifier, Successor, Predecessor, Keys, FingerTable) ->
     receive
         {add_key, Key} ->
             % add the key to the list
             % key is already hashed
             NewList = lists:append(Keys, [Key]),
             loop(
+                NodeIndex,
                 Identifier,
                 Successor,
                 Predecessor,
@@ -167,8 +168,9 @@ loop(Identifier, Successor, Predecessor, Keys, FingerTable) ->
         {get_info, Caller} ->
             % return the node information
             Caller !
-                {Identifier, Successor, Predecessor, Keys, FingerTable},
+                {NodeIndex, Identifier, Successor, Predecessor, Keys, FingerTable},
             loop(
+                NodeIndex,
                 Identifier,
                 Successor,
                 Predecessor,
@@ -177,6 +179,7 @@ loop(Identifier, Successor, Predecessor, Keys, FingerTable) ->
             );
         {set_successor, NewSuccessor} ->
             loop(
+                NodeIndex,
                 Identifier,
                 NewSuccessor,
                 Predecessor,
@@ -185,6 +188,7 @@ loop(Identifier, Successor, Predecessor, Keys, FingerTable) ->
             );
         {set_predecessor, NewPredecessor} ->
             loop(
+                NodeIndex,
                 Identifier,
                 Successor,
                 NewPredecessor,
@@ -193,6 +197,7 @@ loop(Identifier, Successor, Predecessor, Keys, FingerTable) ->
             );
         {set_finger_table, NewFingerTable} ->
             loop(
+                NodeIndex,
                 Identifier,
                 Successor,
                 Predecessor,
