@@ -18,10 +18,6 @@ init() ->
     {ok, KeysData} = file:read_file("keys.csv"),
     Keys = parse_keys(KeysData),
 
-    % Read queries from key_queries.csv
-    % {ok, QueriesData} = file:read_file("key_queries.csv"),
-    % Queries = parse_keys(QueriesData),
-
     % Start initial DHT node
 
     % Start with ?NumberOfNodes nodes
@@ -75,22 +71,10 @@ init() ->
         NodesWithPid
     ).
 
-% Process queries
-% process_queries(Queries, Nodes).
-
 parse_keys(Data) ->
     Lines = string:tokens(binary_to_list(Data), "\n\r"),
     [list_to_integer(Line) || Line <- Lines].
 
-% process_queries([], _) ->
-%     ok;
-% process_queries([Query | Rest], [FirstNode | _] = Nodes) ->
-%     FirstNode ! {get, Query, self()},
-%     receive
-%         {Query, Value} ->
-%             io:format("Query: ~p -> value: ~p~n", [Query, Value])
-%     end,
-%     process_queries(Rest, Nodes).
 
 create_directory(Dir) ->
     case file:make_dir(Dir) of
