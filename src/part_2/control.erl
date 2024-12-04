@@ -1,5 +1,5 @@
 -module(control).
--import(dht, [start/2, get_node_info/1, calculate_hash/1, query_key/2]).
+-import(dht, [start/2, get_node_info/1, calculate_hash/1, query_key/3]).
 -import(lists, [nth/2, map/2]).
 -import(string, [to_lower/1]).
 -import(file, [read_file/1, write_file/2, make_dir/1]).
@@ -7,7 +7,8 @@
 -export([start/0, init/0]).
 
 % MODIFY THE NUMBER OF NODES HERE ---------------------------
--define(NumberOfNodes, 10).
+-define(NumberOfNodes, 100).
+-define(StartingNodeIndex, 40).
 % ----------------------------------------------------------
 
 start() ->
@@ -46,7 +47,7 @@ init() ->
     % ),
 
     % Process queries
-    process_queries(Queries, NodesWithPid).
+    process_queries(Queries, NodesWithPid, []).
 
 % add keys to DHT
 % add_keys_to_dht(Keys, Nodes) ->
@@ -59,12 +60,30 @@ parse_keys(Data) ->
     Lines = string:tokens(binary_to_list(Data), "\n\r"),
     [list_to_integer(Line) || Line <- Lines].
 
-process_queries([], _) ->
+process_queries([], _, QueriedIdentifiers) ->
+    % QueriedIdentifiers is a list of strings in the form of "key_identifier|queried_node1_identifier|queried_node2_identifier|..."
+    % Write one line for each query
+    io:format("Queried Identifiers: ~p~n", [QueriedIdentifiers]),
+    file:write_file(
+        io_lib:format("node_~p_queries.csv", [?StartingNodeIndex]),
+        lists:foldl(
+            fun(Query, Acc) ->
+                case Acc of
+                    "" -> Query;
+                    _ -> Acc ++ "\n" ++ Query
+                end
+            end,
+            "",
+            QueriedIdentifiers
+        )
+    ),
     ok;
-process_queries([Query | Rest], Nodes) ->
+process_queries([Query | Rest], Nodes, QueriedIdentifiers) ->
     % key is hashed in query_key
-    dht:query_key(Nodes, Query),
-    process_queries(Rest, Nodes).
+    NewQueriedIdentifiers = dht:query_key(Nodes, Query, ?StartingNodeIndex),
+
+    % append the new queried identifiers to the list
+    process_queries(Rest, Nodes, lists:append(QueriedIdentifiers, [NewQueriedIdentifiers])).
 
 % create_directory(Dir) ->
 %     case file:make_dir(Dir) of

@@ -6,7 +6,7 @@
     loop/6,
     calculate_hash/1,
     hash_to_string/1,
-    query_key/2
+    query_key/3
 ]).
 -import(crypto, [hash/2, sha/1]).
 -import(lists, [seq/2, map/2, filter/2, append/2, reverse/1, nth/2]).
@@ -177,20 +177,21 @@ loop(NodeIndex, Identifier, Successor, Predecessor, Keys, FingerTable) ->
                 Keys,
                 FingerTable
             );
-        {query_key, Key, Caller} ->
+        {query_key, Key, Caller, QueriedIdentifiers} ->
             % check if the key is in the node's keys
             % io:format("Node ~p: Querying for key ~p, is in keys: ~p, Keys: ~p~n", [
             %     Identifier, Key, lists:member(Key, Keys), Keys
             % ]),
+            NewQueriedIdentifiers = lists:append(QueriedIdentifiers, [Identifier]),
             case lists:member(Key, Keys) of
                 true ->
-                    Caller ! {key_found, Identifier, self()};
+                    Caller ! {key_found, Identifier, self(), NewQueriedIdentifiers};
                 false ->
                     % check if the key is in the finger table
                     {ResponsibleNodeHashedId, ResponsibleNodePid} = find_responsible_node(
                         Key, FingerTable
                     ),
-                    ResponsibleNodePid ! {query_key, Key, Caller}
+                    ResponsibleNodePid ! {query_key, Key, Caller, NewQueriedIdentifiers}
             end,
             loop(
                 NodeIndex,
@@ -238,7 +239,11 @@ find_responsible_node(Key, FingerTable) ->
         fun(I, {ResponsibleNodeHashedId, ResponsibleNodePid}) ->
             {FingerNodeHashedId, FingerNodePid} = maps:get(I, FingerTable),
             % io:format("Checking finger ~p for Key ~p~n", [FingerNodeHashedId, Key]),
-            case FingerNodeHashedId >= Key andalso (FingerNodeHashedId - Key < ResponsibleNodeHashedId - Key orelse ResponsibleNodeHashedId < Key) of
+            case
+                FingerNodeHashedId >= Key andalso
+                    (FingerNodeHashedId - Key < ResponsibleNodeHashedId - Key orelse
+                        ResponsibleNodeHashedId < Key)
+            of
                 true ->
                     {FingerNodeHashedId, FingerNodePid};
                 false ->
@@ -248,7 +253,7 @@ find_responsible_node(Key, FingerTable) ->
         % Start with the first entry
         maps:get(0, FingerTable),
         % Check all entries from M to 1, i.e., check the highest entries first
-        lists:seq(?M-1, 1, -1)
+        lists:seq(?M - 1, 1, -1)
     ).
 
 % Request node information
@@ -258,15 +263,30 @@ get_node_info(Node) ->
         Info -> Info
     end.
 
-query_key(NodesWithPid, Key) ->
+query_key(NodesWithPid, Key, StartingNodeIndex) ->
     HashedKey = calculate_hash(Key),
     io:format("Querying for key ~p (not hashed ~p)~n", [HashedKey, Key]),
-    [{_StartNodeId, _StartNodeIndex, StartNodePid} | _] = NodesWithPid,
-    StartNodePid ! {query_key, HashedKey, self()},
+
+    % Start with the starting node
+    {_, _, StartNodePid} = lists:nth(StartingNodeIndex, NodesWithPid),
+    StartNodePid ! {query_key, HashedKey, self(), []},
     receive
-        {key_found, NodeIdentifier, NodePid} ->
+        {key_found, NodeIdentifier, NodePid, QueriedIdentifiers} ->
             io:format("Key ~p found at node ~p with pid ~p~n", [HashedKey, NodeIdentifier, NodePid]),
-            NodePid;
+
+            io:format("Queried nodes: ~p~n", [QueriedIdentifiers]),
+            % QueriedIdentifiers;
+            % make a string: "key_identifier|queried_identifiers"
+            lists:foldl(
+                fun(QueriedIdentifier, Acc) ->
+                    case Acc of
+                        "" -> hash_to_string(HashedKey) ++ "|" ++ hash_to_string(QueriedIdentifier);
+                        _ -> Acc ++ "|" ++ hash_to_string(QueriedIdentifier)
+                    end
+                end,
+                "",
+                QueriedIdentifiers
+            );
         _Other ->
             io:format("Key ~p not found~n", [HashedKey]),
             undefined
