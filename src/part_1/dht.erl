@@ -133,60 +133,12 @@ loop(NodeIndex, Identifier, Successor, Predecessor, Keys) ->
             ok
     end.
 
-% Add a key to the DHT
-% Nodes is the list of node Pids
-% Key is the key to add (not hashed)
-% add_key(Nodes, Key) ->
-%     % Nodes is the list of node Pids
-%     HashedKey = calculate_hash(Key),
-%     {_, ResponsibleNode} = find_responsible_node(HashedKey, Nodes),
-%     ResponsibleNode ! {add_key, HashedKey}.
-
-% % Find the node responsible for a hashed key
-% % Nodes is the list of node Pids
-% % HashedKey is the hashed key
-% find_responsible_node(HashedKey, Nodes) ->
-%     % get the node information for each node
-%     NodeInfoList = lists:map(
-%         fun(Node) ->
-%             {_, NodeId, _, _, _, _, _} = get_node_info(Node),
-%             {NodeId, Node}
-%         end,
-%         Nodes
-%     ),
-%     % filter the list of nodes to find the first node that has an Id greater than the hashed key, otherwise wrap around
-%     ResponsibleNode =
-%         case lists:filter(fun({NodeId, _}) -> HashedKey =< NodeId end, NodeInfoList) of
-%             [] -> hd(NodeInfoList);
-%             [{NodeId, Node} | _] -> {NodeId, Node}
-%         end,
-%     ResponsibleNode.
-
 % Request node information
 get_node_info(Node) ->
     Node ! {get_info, self()},
     receive
         Info -> Info
     end.
-
-% % Utility: Find successor node
-% find_successor(Id, NodeIds) ->
-%     % basically, make a list of Xs that come from the NodeIds list, where X is greater than Id
-%     case [X || X <- NodeIds, X > Id] of
-%         % if the list is empty, return the head of the NodeIds list
-%         [] -> hd(NodeIds);
-%         % otherwise, return the first element of the list
-%         [Successor | _] -> Successor
-%         % so what this does is that it finds the next node in the ring that is greater than the current node, if there is none (i.e., last node), it returns the first node in the ring
-%     end.
-
-% % Utility: Find predecessor node
-% find_predecessor(Id, NodeIds) ->
-%     % kind of the opposite of find_successor
-%     case lists:reverse([X || X <- NodeIds, X < Id]) of
-%         [] -> lists:last(NodeIds);
-%         [Predecessor | _] -> Predecessor
-%     end.
 
 % Utility: Calculate SHA-1 hash of an identifier
 calculate_hash(Key) ->

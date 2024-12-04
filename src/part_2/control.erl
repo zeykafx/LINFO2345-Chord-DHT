@@ -31,9 +31,6 @@ init() ->
     {ok, NodesWithPid} = dht:start(?NumberOfNodes, Keys),
     io:format("Nodes started~n"),
 
-    % % Add keys to DHT
-    % add_keys_to_dht(Keys, Nodes),
-
     % lists:map(
     %     fun({_NodeId, _NodeIndex, Pid}) ->
     %         % node id is not hashed, Identifier is hashed
@@ -65,6 +62,7 @@ parse_keys(Data) ->
 process_queries([], _) ->
     ok;
 process_queries([Query | Rest], Nodes) ->
+    % key is hashed in query_key
     dht:query_key(Nodes, Query),
     process_queries(Rest, Nodes).
 
