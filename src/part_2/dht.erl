@@ -110,7 +110,6 @@ finish_initialization(NodesWithPid, SortedHashedNodeIds) ->
     ).
 
 create_finger_table(NodeIdx, NodesWithPid, NumberNodes) ->
-    % Create a finger table entry for each bit position
     lists:foldl(
         fun(I, FingerTable) ->
             % Calculate the target position for this finger

@@ -18,9 +18,10 @@ Or run the following command in the src/part_2 directory:
 ```bash
 make all
 ```
-This will generate a csv file called `node_StartingNodeIndex_queries.csv` in the src/part_2 directory (with StartingNodeIndex being the value of that variable).
 
 ### Output
+This will generate a csv file called `node_StartingNodeIndex_queries.csv` in the src/part_2 directory (with StartingNodeIndex being the value of that variable).
+
 The csv file will contain one line for each key queried, with the following format:
 ```
 key_identifier,contacted_node_identifier1|contacted_node_identifier2|contacted_node_identifier3...

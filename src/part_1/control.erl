@@ -7,7 +7,7 @@
 -export([start/0, init/0]).
 
 % MODIFY THE NUMBER OF NODES HERE ---------------------------
--define(NumberOfNodes, 100).
+-define(NumberOfNodes, 50).
 % ----------------------------------------------------------
 
 start() ->
